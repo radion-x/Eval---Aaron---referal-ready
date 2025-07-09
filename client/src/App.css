@@ -1,0 +1,89 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-animation {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Moon Terminal Theme Colors */
+:root {
+  --moon-blue: #3A55FF;
+  --moon-violet: #8450DE;
+  --moon-green: #04DB64;
+  --moon-cream: #EDE4D3F;
+  --moon-white: #FFFFFF;
+  --chinese-white: #F5F5F5;
+  --chinese-black: #131313;
+  --dark-black: #000000;
+}
+
+.btn-primary {
+  @apply bg-[#3A55FF] hover:bg-[#2940CC] text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl;
+}
+
+.btn-secondary {
+  @apply bg-white border-2 border-[#3A55FF] text-[#3A55FF] hover:bg-[#F5F7FF] font-semibold py-3 px-6 rounded-lg transition-all duration-300;
+}
+
+.form-container {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8;
+}
+
+.form-title {
+  @apply text-2xl font-bold text-[#131313] dark:text-white mb-6;
+}
+
+.step-container {
+  @apply form-container form-animation max-w-4xl mx-auto;
+}
+
+/* Timeline Styles */
+.timeline-container {
+  @apply relative flex flex-col md:flex-row gap-8 mb-12;
+}
+
+.timeline-step {
+  @apply flex items-center gap-4 relative;
+}
+
+.timeline-step::before {
+  content: '';
+  @apply absolute top-1/2 left-6 w-full h-0.5 bg-[#3A55FF] opacity-20;
+}
+
+.timeline-step:last-child::before {
+  @apply hidden;
+}
+
+.timeline-number {
+  @apply w-12 h-12 rounded-full bg-[#3A55FF] text-white flex items-center justify-center font-bold text-lg z-10;
+}
+
+.timeline-content {
+  @apply flex-1;
+}
+
+.timeline-title {
+  @apply text-lg font-semibold text-[#131313] mb-1;
+}
+
+.timeline-description {
+  @apply text-sm text-neutral-600;
+}
+
+/* Active Step Highlight */
+.timeline-step.active .timeline-number {
+  @apply bg-[#04DB64];
+}
+
+.timeline-step.completed .timeline-number {
+  @apply bg-[#8450DE];
+}

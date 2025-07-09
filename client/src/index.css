@@ -1,0 +1,113 @@
+@tailwind base;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%; 
+  /* overflow: hidden; -- Keep scrolling enabled */
+  transition: background-color 0.3s ease; /* Smooth transition for background */
+}
+
+body.dark {
+  background-color: #131313; /* Use chinese-black for a slightly softer black */
+  color: #F5F5F5; /* Default text color for dark mode */
+}
+
+body.light {
+  background-color: #f0f2f5; /* Light theme background */
+  color: #131313; /* Default text color for light mode */
+}
+
+/* Dark mode styles for form inputs, textareas, and selects */
+.dark input[type="text"],
+.dark input[type="date"],
+.dark input[type="tel"],
+.dark input[type="email"],
+.dark input[type="number"],
+.dark input[type="password"],
+.dark textarea,
+.dark select {
+  background-color: #1f1f1f; /* A darker gray for input fields */
+  color: #F5F5F5;
+  border-color: #444; /* A lighter gray for borders */
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #888;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Ensure the root div for React also takes full height */
+#root {
+  min-height: 100%; /* Use min-height to allow expansion */
+  display: flex; /* Optional: if you want #root to behave like a flex container */
+  flex-direction: column; /* Optional */
+}
+
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .thinking-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+    animation: thinking-bounce 1.4s infinite ease-in-out both;
+  }
+  .thinking-dot-delay-1 {
+    animation-delay: -0.32s;
+  }
+  .thinking-dot-delay-2 {
+    animation-delay: -0.16s;
+  }
+}
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.5); /* Start smaller */
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .pulsate-attention {
+    /* Ensure other border/ring utilities are not overridden if not desired */
+    /* This animation will apply a box-shadow */
+    animation: pulsate-attention-glow 2s infinite ease-in-out;
+  }
+}
+
+@keyframes pulsate-attention-glow {
+  0%, 100% {
+    /* Using a neutral shadow that works on light/dark, or make theme-aware */
+    /* For blue-500 (59 130 246), a subtle start/end */
+    box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.0); 
+  }
+  50% {
+    /* Brighter, more spread shadow at midpoint */
+    box-shadow: 0 0 8px 3px rgba(59, 130, 246, 0.4); 
+  }
+}
+
+@layer utilities {
+  .pulsate-attention-goals {
+    animation: pulsate-attention-goals-glow 2s infinite ease-in-out;
+  }
+}
+
+@keyframes pulsate-attention-goals-glow {
+  0%, 100% {
+    /* Using green-500 (34 197 94) */
+    box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.0); 
+  }
+  50% {
+    box-shadow: 0 0 8px 3px rgba(34, 197, 94, 0.4); 
+  }
+}
