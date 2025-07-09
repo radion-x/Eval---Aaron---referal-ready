@@ -160,6 +160,7 @@ const assessmentSchema = new mongoose.Schema({
   painMapImageBack: { type: String },
   nextStep: { type: String },
   recommendationText: { type: String },
+  systemRecommendation: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -556,9 +557,9 @@ app.post('/api/email/send-assessment', async (req, res) => {
   }
 
   try {
-    const { formData, aiSummary, recommendationText, clientOrigin } = req.body; 
+    const { formData, aiSummary, recommendationText, nextStep, systemRecommendation, clientOrigin } = req.body;
 
-    if (!formData || !aiSummary) { 
+    if (!formData || !aiSummary) {
       return res.status(400).json({ error: 'Missing required data for email (formData or aiSummary).' });
     }
     
@@ -602,7 +603,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
     }
 
     // Send email to admin/BCC
-    const adminHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText }, serverBaseUrl, 'admin');
+    const adminHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'admin');
     const adminMailOptions = {
       from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
       to: Array.from(adminRecipients).join(', '),
@@ -614,7 +615,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
 
     // Send email to patient
     if (patientEmail && typeof patientEmail === 'string' && patientEmail.trim() !== '' && !adminRecipients.has(patientEmail)) {
-      const patientHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText }, serverBaseUrl, 'patient');
+      const patientHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'patient');
       const patientMailOptions = {
         from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
         to: patientEmail,
@@ -665,7 +666,7 @@ server.listen(port, () => {
 });
 
 function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
-  const { formData, aiSummary, recommendationText } = data;
+  const { formData, aiSummary, recommendationText, nextStep } = data;
 
   let html = `
     <html>
@@ -986,18 +987,18 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
         </div>
       `;
     }
-    if (formData.nextStep) {
+    if (nextStep) {
         html += `
         <div class="section">
           <div class="section-title">Next Step Chosen by User</div>
-          <p>${formData.nextStep}</p>
+          <p>${nextStep}</p>
         </div>
       `;
     }
     if (recommendationText) {
       html += `
         <div class="section">
-          <div class="section-title">Next Step Flagged by Spinal Intelligence Engine</div>
+          <div class="section-title">Adaptive Next-Step Evaluation</div>
           <p>${recommendationText}</p>
         </div>
       `;

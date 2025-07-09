@@ -4,13 +4,13 @@ import { useTheme } from '../../context/ThemeContext';
 // import { RedFlagsData } from '../../data/formData'; // RedFlagsData type is implicitly handled via formData
 
 const SummaryStep: React.FC = () => {
-  const { 
-    formData, 
+  const {
+    formData,
     updateFormData,
     // setSubmitAction,  // Changed to registerSubmitAction
     registerSubmitAction,
     setIsReadyForFinalSubmit,
-    summaryProcessCompletedForSession, 
+    summaryProcessCompletedForSession,
     setSummaryProcessCompletedForSession,
     aiSummary: contextAiSummary,
     setAiSummary: setContextAiSummary,
@@ -21,106 +21,25 @@ const SummaryStep: React.FC = () => {
   const { theme } = useTheme();
 
   const formDataRef = useRef(formData);
-  
-  function getRecommendation() {
-    const currentFormData = formDataRef.current; 
-    let hasCriticalRedFlags = false;
 
-    if (currentFormData.redFlags) {
-      const {
-        muscleWeakness,
-        numbnessOrTingling,
-        unexplainedWeightLoss,
-        bladderOrBowelIncontinence,
-        saddleAnaesthesia,
-        balanceProblems,
-        // onsetIncontinence, // Removed, now part of bladderOrBowelIncontinence
-        otherRedFlagPresent,
-        otherRedFlag
-      } = currentFormData.redFlags;
-
-      // Check for spinalFracture from diagnoses
-      if (currentFormData.diagnoses?.spinalFracture) {
-        hasCriticalRedFlags = true;
-      }
-
-      // Muscle Weakness (iterate through areas) - Severity check removed
-      if (!hasCriticalRedFlags && muscleWeakness?.present && muscleWeakness.areas) {
-        for (const areaKey in muscleWeakness.areas) {
-          if (muscleWeakness.areas[areaKey].selected) { // Severity check removed
-            hasCriticalRedFlags = true;
-            break;
-          }
-        }
-      }
-      
-      // Numbness or Tingling (iterate through areas) - Severity check removed
-      if (!hasCriticalRedFlags && numbnessOrTingling?.present && numbnessOrTingling.areas) {
-        for (const areaKey in numbnessOrTingling.areas) {
-          if (numbnessOrTingling.areas[areaKey].selected) { // Severity check removed
-            hasCriticalRedFlags = true;
-            break;
-          }
-        }
-      }
-
-      // Unexplained Weight Loss
-      if (!hasCriticalRedFlags && unexplainedWeightLoss?.present && (unexplainedWeightLoss.amountKg || 0) > 5) {
-        hasCriticalRedFlags = true;
-      }
-
-      // Bladder or Bowel Incontinence
-      if (!hasCriticalRedFlags && bladderOrBowelIncontinence?.present) { 
-        // If present, it's a critical flag. If it's also new onset, it's definitely critical.
-        hasCriticalRedFlags = true; 
-      }
-      
-      // Saddle Anaesthesia (already just checks present)
-      if (!hasCriticalRedFlags && saddleAnaesthesia?.present) { 
-        hasCriticalRedFlags = true;
-      }
-      
-      // Balance Problems
-      if (!hasCriticalRedFlags && balanceProblems?.present) {
-        const criticalBalanceTypes = ['Frequently unsteady', 'Nearly fallen', 'Fallen or injured from a fall in the past 3 months'];
-        if (balanceProblems.type && criticalBalanceTypes.includes(balanceProblems.type)) {
-          hasCriticalRedFlags = true;
-        }
-      }
-
-      // Other Red Flag
-      if (!hasCriticalRedFlags && otherRedFlagPresent && otherRedFlag && otherRedFlag.trim() !== '') {
-        hasCriticalRedFlags = true;
-      }
-    }
-    
-    const hasSurgery = currentFormData.hadSurgery;
-    const hasImaging = currentFormData.imaging.some(img => img.hadStudy);
-
-    if (hasCriticalRedFlags) return { type: 'specialist', message: 'Based on your responses, particularly the reported red flags, we strongly recommend you see a spine specialist promptly.', color: theme === 'dark' ? 'bg-red-700/30 border-red-500/50 text-red-200' : 'bg-red-100 border-red-500 text-red-800'};
-    if (!hasImaging && currentFormData.painAreas.some(area => area.intensity >= 5)) return { type: 'imaging', message: 'Further imaging may be beneficial to properly assess your condition, especially given your reported pain levels.', color: theme === 'dark' ? 'bg-yellow-700/30 border-yellow-500/50 text-yellow-200' : 'bg-yellow-100 border-yellow-500 text-yellow-800'};
-    if (hasSurgery) return { type: 'specialist', message: 'Given your surgical history, a follow-up with a spine specialist is recommended to discuss your current symptoms.', color: theme === 'dark' ? 'bg-orange-700/30 border-orange-500/50 text-orange-200' : 'bg-orange-100 border-orange-500 text-orange-800'};
-    return { type: 'allied', message: 'Allied health treatment, such as physiotherapy, may be beneficial based on your assessment. Discuss these options with your GP.', color: theme === 'dark' ? 'bg-green-700/30 border-green-500/50 text-green-200' : 'bg-green-100 border-green-500 text-green-800'};
-  };
-  const recommendationRef = useRef(getRecommendation()); 
-
-  const getNextStepSuggestion = () => {
-    const { imaging, painAreas, hadSurgery } = formData;
+  const getNextStepSuggestion = useCallback(() => {
+    const { imaging, painAreas, hadSurgery } = formDataRef.current;
     const hasImaging = imaging.some(img => img.hadStudy);
     const hasHighPain = painAreas.some(area => area.intensity >= 5);
     const hasPersistentSymptoms = painAreas.length > 0;
 
-    if (!hasImaging && hasHighPain) {
-      return "Referral for imaging";
-    }
-    if (hadSurgery && hasPersistentSymptoms) {
-      return "Book a Specialist Appointment";
-    }
-    if (!hadSurgery && hasPersistentSymptoms) {
-      return "Referral to Allied Health";
-    }
+    if (!hasImaging && hasHighPain) return "Referral for imaging";
+    if (hadSurgery && hasPersistentSymptoms) return "Book a Specialist Appointment";
+    if (!hadSurgery && hasPersistentSymptoms) return "Referral to Allied Health";
     return "No Immediate Action Needed";
-  };
+  }, []);
+
+  useEffect(() => {
+    const suggestion = getNextStepSuggestion();
+    if (formData.systemRecommendation !== suggestion) {
+      updateFormData({ systemRecommendation: suggestion });
+    }
+  }, [formData.systemRecommendation, getNextStepSuggestion, updateFormData]);
 
   const [isLoadingAiSummary, setIsLoadingAiSummary] = useState<boolean>(false);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
@@ -130,12 +49,12 @@ const SummaryStep: React.FC = () => {
   const [sendEmailError, setSendEmailError] = useState<string | null>(null);
   const [sendEmailSuccess, setSendEmailSuccess] = useState<string | null>(null);
   const [overallStatusMessage, setOverallStatusMessage] = useState<string | null>(null);
-  
+
   type EmailStatus = 'idle' | 'sending' | 'sent' | 'error';
   const emailStateRef = useRef<EmailStatus>('idle');
 
   const contextAiSummaryRef = useRef(contextAiSummary);
-  const emailSendAttemptedRef = useRef(false); 
+  const emailSendAttemptedRef = useRef(false);
 
   const isInitialProcessingCompleteRef = useRef(isInitialProcessingCompleteForSubmit);
   const saveAssessmentErrorRef = useRef(saveAssessmentError);
@@ -151,21 +70,20 @@ const SummaryStep: React.FC = () => {
     if (!dateString) return 'N/A';
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return dateString; 
+      if (isNaN(date.getTime())) return dateString;
       return date.toLocaleDateString('en-AU', { year: 'numeric', month: 'long', day: 'numeric' });
-    } catch { 
+    } catch {
       return dateString;
     }
   };
-  
+
   const highestPainIntensity = formData.painAreas.length > 0
     ? Math.max(...formData.painAreas.map(area => area.intensity))
     : 0;
 
   useEffect(() => {
     formDataRef.current = formData;
-    contextAiSummaryRef.current = contextAiSummary; 
-    recommendationRef.current = getRecommendation(); 
+    contextAiSummaryRef.current = contextAiSummary;
   }, [formData, contextAiSummary, theme]);
 
   const handleSendEmailInternal = useCallback(async (isUserInitiated = false) => {
@@ -188,12 +106,12 @@ const SummaryStep: React.FC = () => {
       if (!contextAiSummaryRef.current && !aiSummaryErrorRef.current && !isLoadingAiSummaryRef.current) message += "AI Summary not available. ";
       else if (aiSummaryErrorRef.current) message += `AI Summary error: ${aiSummaryErrorRef.current}. `;
       if (saveAssessmentErrorRef.current) message += `Evaluation saving failed: ${saveAssessmentErrorRef.current}`;
-      
+
       setTimeout(() => setOverallStatusMessage(message.trim()), 0);
-      emailStateRef.current = 'error'; 
+      emailStateRef.current = 'error';
       return;
     }
-    
+
     emailStateRef.current = 'sending';
     setSendEmailError(null);
     setSendEmailSuccess(null);
@@ -202,17 +120,16 @@ const SummaryStep: React.FC = () => {
     try {
       const currentFormData = formDataRef.current;
       const currentContextAiSummary = contextAiSummaryRef.current;
-      const currentRecommendation = recommendationRef.current;
       const cleanFormDataForEmail = { ...currentFormData };
 
       const emailPayload = {
         formData: cleanFormDataForEmail,
         aiSummary: currentContextAiSummary,
-        recommendationText: currentRecommendation.message,
-        nextStep: currentFormData.nextStep,
+        recommendationText: currentFormData.systemRecommendation, // System's suggestion
+        nextStep: currentFormData.nextStep, // User's choice
         clientOrigin: window.location.origin,
       };
-      const emailResponse = await fetch('/api/email/send-assessment', { 
+      const emailResponse = await fetch('/api/email/send-assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailPayload),
@@ -232,12 +149,12 @@ const SummaryStep: React.FC = () => {
       emailStateRef.current = 'error';
     }
   }, [
-    setSendEmailError, 
-    setSendEmailSuccess, 
+    setSendEmailError,
+    setSendEmailSuccess,
     setOverallStatusMessage,
     setIsSubmissionSuccessful
   ]);
-  
+
   const userInitiatedSend = useCallback(() => {
     return handleSendEmailInternal(true);
   }, [handleSendEmailInternal]);
@@ -272,19 +189,24 @@ const SummaryStep: React.FC = () => {
         setContextAiSummary(fetchedAiSummary);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error fetching AI summary.";
-        setAiSummaryError(message); 
+        setAiSummaryError(message);
         setOverallStatusMessage(`Error generating AI summary: ${message}`);
       } finally {
         setIsLoadingAiSummary(false);
       }
-      
+
       if (fetchedAiSummary) {
         setOverallStatusMessage("AI summary generated. Saving evaluation...");
         setIsSavingAssessment(true);
         try {
           const currentFormData = formDataRef.current;
           const cleanFormDataForSave = { ...currentFormData };
-          const assessmentToSave = { ...cleanFormDataForSave, aiSummary: fetchedAiSummary, recommendationText: recommendationRef.current.message };
+          const assessmentToSave = { 
+            ...cleanFormDataForSave, 
+            aiSummary: fetchedAiSummary, 
+            recommendationText: currentFormData.systemRecommendation, // System's suggestion
+            nextStep: currentFormData.nextStep // User's choice
+          };
           const saveResponse = await fetch('/api/assessment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -296,47 +218,47 @@ const SummaryStep: React.FC = () => {
           setOverallStatusMessage(null);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error saving evaluation.";
-          setSaveAssessmentError(message); 
+          setSaveAssessmentError(message);
           setOverallStatusMessage(`Error saving evaluation: ${message}`);
         } finally {
           setIsSavingAssessment(false);
         }
       }
-      
+
       setIsInitialProcessingCompleteForSubmit(true);
       setSummaryProcessCompletedForSession(true);
       isPerformingWorkRef.current = false;
     };
 
     if (formData.consent && !summaryProcessCompletedForSession) {
-      if (!isPerformingWorkRef.current) { 
+      if (!isPerformingWorkRef.current) {
         performSummaryAndSave();
       }
-    } else if (!formData.consent && summaryProcessCompletedForSession) { 
+    } else if (!formData.consent && summaryProcessCompletedForSession) {
       setContextAiSummary(null);
-      setAiSummaryError(null); 
-      setSaveAssessmentError(null); 
+      setAiSummaryError(null);
+      setSaveAssessmentError(null);
       setSaveAssessmentSuccess(null);
       setOverallStatusMessage(null);
       setIsInitialProcessingCompleteForSubmit(false);
       setSummaryProcessCompletedForSession(false);
-      isPerformingWorkRef.current = false; 
+      isPerformingWorkRef.current = false;
     } else if (formData.consent && summaryProcessCompletedForSession && !isInitialProcessingCompleteForSubmit) {
       if (contextAiSummary) {
          setIsInitialProcessingCompleteForSubmit(true);
       }
     }
   }, [
-    formData.consent, 
+    formData.consent,
     summaryProcessCompletedForSession,
-    setContextAiSummary, 
-    setAiSummaryError, 
-    setSaveAssessmentError, 
-    setSaveAssessmentSuccess, 
-    setOverallStatusMessage, 
-    setIsInitialProcessingCompleteForSubmit, 
+    setContextAiSummary,
+    setAiSummaryError,
+    setSaveAssessmentError,
+    setSaveAssessmentSuccess,
+    setOverallStatusMessage,
+    setIsInitialProcessingCompleteForSubmit,
     setSummaryProcessCompletedForSession,
-    contextAiSummary 
+    contextAiSummary
   ]);
 
   useEffect(() => {
@@ -345,9 +267,9 @@ const SummaryStep: React.FC = () => {
       setIsReadyForFinalSubmit(isReady);
     }
   }, [
-    isInitialProcessingCompleteForSubmit, 
-    contextAiSummary, 
-    saveAssessmentError, 
+    isInitialProcessingCompleteForSubmit,
+    contextAiSummary,
+    saveAssessmentError,
     setIsReadyForFinalSubmit
   ]);
 
@@ -370,7 +292,7 @@ const SummaryStep: React.FC = () => {
 
   const renderRedFlags = () => {
     if (!formDataRef.current.redFlags) return <p>No red flag data available.</p>;
-    
+
     const redFlags = formDataRef.current.redFlags;
     const reportedItems: JSX.Element[] = [];
 
@@ -379,11 +301,11 @@ const SummaryStep: React.FC = () => {
         reportedItems.push(<li key={label} className={listItemBaseClass}>{label}{details ? `: ${details}` : ''}</li>);
       }
     };
-    
+
     if (redFlags.muscleWeakness?.present && redFlags.muscleWeakness.areas) {
       const selectedAreas = Object.entries(redFlags.muscleWeakness.areas)
         .filter(([, areaDetail]) => areaDetail.selected)
-        .map(([areaName]) => areaName); 
+        .map(([areaName]) => areaName);
       if (selectedAreas.length > 0) {
         addFlagItem('Muscle Weakness', true, selectedAreas.join(', '));
       } else {
@@ -394,21 +316,21 @@ const SummaryStep: React.FC = () => {
     if (redFlags.numbnessOrTingling?.present && redFlags.numbnessOrTingling.areas) {
       const selectedAreas = Object.entries(redFlags.numbnessOrTingling.areas)
         .filter(([, areaDetail]) => areaDetail.selected)
-        .map(([areaName]) => areaName); 
+        .map(([areaName]) => areaName);
       if (selectedAreas.length > 0) {
         addFlagItem('Numbness Or Tingling', true, selectedAreas.join(', '));
       } else {
         addFlagItem('Numbness Or Tingling', true, "Present, no specific areas detailed.");
       }
     }
-    
+
     if (redFlags.unexplainedWeightLoss?.present) {
       let uwlDetails = '';
       if (redFlags.unexplainedWeightLoss.amountKg) uwlDetails += `Amount: ${redFlags.unexplainedWeightLoss.amountKg}kg`;
       if (redFlags.unexplainedWeightLoss.period) uwlDetails += `${uwlDetails ? ', ' : ''}Period: ${redFlags.unexplainedWeightLoss.period}`;
       addFlagItem('Unexplained Weight Loss', true, uwlDetails || "Details not specified");
     }
-    
+
     if (redFlags.bladderOrBowelIncontinence?.present) {
       let bbDetails = '';
       if (redFlags.bladderOrBowelIncontinence.details) {
@@ -419,7 +341,7 @@ const SummaryStep: React.FC = () => {
       }
       addFlagItem('Bladder Or Bowel Incontinence', true, bbDetails || "Details not specified");
     }
-    
+
     if (redFlags.saddleAnaesthesia?.present) {
       let saDetails = '';
       if (redFlags.saddleAnaesthesia.details) {
@@ -444,7 +366,7 @@ const SummaryStep: React.FC = () => {
       </ul>
     );
   };
-  
+
   return (
     <div className="step-container bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl">
       <h2 className="form-title text-gray-800 dark:text-white">Summary: Review and Next Steps</h2>
@@ -472,18 +394,13 @@ const SummaryStep: React.FC = () => {
           </div>
         </div>
 
-        <div className={`p-4 rounded-md border-l-4 ${recommendationRef.current.color} hidden`}>
-          <h3 className="font-semibold text-lg mb-1">Recommendation</h3>
-          <p>{recommendationRef.current.message}</p>
-        </div>
-
         <div className={cardBaseClass}>
             <div className={cardHeaderBaseClass}><h3 className={cardTitleBaseClass}>Red Flag Symptoms</h3></div>
             <div className={cardContentBaseClass}>
               {renderRedFlags()}
             </div>
         </div>
-        
+
         {formDataRef.current.treatmentGoals && (
           <div className={cardBaseClass}>
             <div className={cardHeaderBaseClass}><h3 className={cardTitleBaseClass}>Your Treatment Goals</h3></div>
@@ -587,9 +504,9 @@ const SummaryStep: React.FC = () => {
                     <li key={index} className={listItemBaseClass}>
                       {img.type} {img.date && `(${formatDate(img.date)})`} {img.clinic && ` at ${img.clinic}`}
                       {img.documentName && (
-                        <a 
-                          href={`${import.meta.env.VITE_SERVER_BASE_URL}/uploads/assessment_files/${img.documentName}`} 
-                          target="_blank" 
+                        <a
+                          href={`${import.meta.env.VITE_SERVER_BASE_URL}/uploads/assessment_files/${img.documentName}`}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="ml-2 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
                         >
@@ -680,7 +597,7 @@ const SummaryStep: React.FC = () => {
             {formDataRef.current.demographics.medicareNumber && (
               <div><p className="text-sm text-gray-500 dark:text-gray-400">Medicare Number</p><p className="font-medium">{formDataRef.current.demographics.medicareNumber}</p></div>
             )}
-            {formDataRef.current.demographics.medicareRefNum && ( 
+            {formDataRef.current.demographics.medicareRefNum && (
               <div><p className="text-sm text-gray-500 dark:text-gray-400">Medicare Ref. No.</p><p className="font-medium">{formDataRef.current.demographics.medicareRefNum}</p></div>
             )}
             {formDataRef.current.demographics.countryOfBirth && (
@@ -693,7 +610,7 @@ const SummaryStep: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {!formData.consent && isInitialProcessingCompleteForSubmit && <p className="text-sm text-red-600 dark:text-red-400 mt-2 text-right">Consent must be provided on the first step to generate summary and enable submission.</p>}
         {isInitialProcessingCompleteForSubmit && !!saveAssessmentError && <p className="text-sm text-red-600 dark:text-red-400 mt-2 text-right">Cannot proceed to email due to an error saving the evaluation. Please try refreshing or contact support.</p>}
 
@@ -767,12 +684,12 @@ const SummaryStep: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {/* MOVED STATUS MESSAGES HERE */}
         <div className="mt-6 space-y-2">
           {overallStatusMessage && (
              <div className={`p-3 rounded-md text-sm ${
-              (aiSummaryError || saveAssessmentError || sendEmailError) 
+              (aiSummaryError || saveAssessmentError || sendEmailError)
                 ? (theme === 'dark' ? 'bg-red-700/30 border border-red-500/50 text-red-200' : 'bg-red-100 border border-red-500 text-red-800')
                 : (theme === 'dark' ? 'bg-blue-800/30 border border-blue-600/50 text-blue-200' : 'bg-blue-50 border border-blue-300 text-blue-800')
             }`}>
@@ -780,7 +697,7 @@ const SummaryStep: React.FC = () => {
             </div>
           )}
           {isSavingAssessment && !saveAssessmentSuccess && !saveAssessmentError && <p className="text-sm text-blue-600 dark:text-blue-400">Saving evaluation data...</p>}
-          
+
           {saveAssessmentSuccess && !sendEmailSuccess && !sendEmailError && (
             <div className={`p-3 rounded-md text-sm ${theme === 'dark' ? 'bg-green-700/30 border border-green-500/50 text-green-200' : 'bg-green-100 border border-green-500 text-green-800'}`}>
               {saveAssessmentSuccess}

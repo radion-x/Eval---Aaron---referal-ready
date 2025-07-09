@@ -98,6 +98,7 @@ interface ServerAssessment {
   painMapImageBack?: string;
   nextStep?: string;
   recommendationText?: string;
+  systemRecommendation?: string;
   createdAt: string; 
   updatedAt: string; 
 }
@@ -592,7 +593,7 @@ const DoctorDashboard: React.FC = () => {
                       </SectionCard>
                     )}
                     {renderTextSection("Next Step Chosen by User", assessment.nextStep)}
-                    {renderTextSection("Next Step Flagged by Spinal Intelligence Engine", assessment.recommendationText)}
+                    {renderTextSection("Adaptive Next-Step Evaluation", assessment.systemRecommendation)}
                     {renderTextSection("AI Summary", assessment.aiSummary, true)}
                     {/* Removed raw JSON dump */}
                   </div>

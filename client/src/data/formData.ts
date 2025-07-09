@@ -179,6 +179,7 @@ export interface FormData {
   painMapImageFront?: string;
   painMapImageBack?: string;
   nextStep?: string;
+  systemRecommendation?: string;
 }
 
 export const initialFormData: FormData = {
@@ -284,4 +285,5 @@ export const initialFormData: FormData = {
   painMapImageFront: '',
   painMapImageBack: '',
   nextStep: '',
+  systemRecommendation: '',
 };
