@@ -603,7 +603,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
     }
 
     // Send email to admin/BCC
-    const adminHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'admin');
+    const adminHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: formData.systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'admin');
     const adminMailOptions = {
       from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
       to: Array.from(adminRecipients).join(', '),
@@ -615,7 +615,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
 
     // Send email to patient
     if (patientEmail && typeof patientEmail === 'string' && patientEmail.trim() !== '' && !adminRecipients.has(patientEmail)) {
-      const patientHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'patient');
+      const patientHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: formData.systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'patient');
       const patientMailOptions = {
         from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
         to: patientEmail,
@@ -695,6 +695,22 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
         <div class="section">
           <div class="section-title">Spinal AI Matrix Analysis</div>
           <p>${aiSummary.replace(/\n/g, '<br>')}</p>
+        </div>
+      `;
+    }
+    if (nextStep) {
+        html += `
+        <div class="section">
+          <div class="section-title">Next Step Chosen by User</div>
+          <p>${nextStep}</p>
+        </div>
+      `;
+    }
+    if (recommendationText) {
+      html += `
+        <div class="section">
+          <div class="section-title">Adaptive Next-Step Evaluation</div>
+          <p>${recommendationText}</p>
         </div>
       `;
     }
