@@ -1,371 +1,30 @@
 const express = require('express');
-const cors = require('cors');
+const router = express.Router();
 const { Anthropic } = require('@anthropic-ai/sdk');
-const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
-const multer = require('multer');
+const Assessment = require('../models/Assessment');
+const transporter = require('../config/nodemailer');
+const { generateComprehensivePrompt } = require('../prompt-builder.js');
 const path = require('path');
 const fs = require('fs');
-const session = require('express-session');
-const http = require('http');
-const https = require('https');
-const { generateComprehensivePrompt } = require('./prompt-builder.js');
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
-const app = express();
-
-// --- DIRECTORY SETUP ---
-const baseUploadsDir = path.join(__dirname, 'public/uploads');
-const baseAssessmentFilesDir = path.join(baseUploadsDir, 'assessment_files');
-const tempUploadDir = path.join(baseUploadsDir, 'temp'); // Temporary directory for initial uploads
-
-// Ensure all necessary directories exist
-[baseUploadsDir, baseAssessmentFilesDir, tempUploadDir].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
-
-const port = process.env.SERVER_PORT || 3001;
-
-// --- DATABASE & MIDDLEWARE ---
-const mongoUri = process.env.MONGODB_URI;
-if (!mongoUri) {
-  console.error("CRITICAL: MONGODB_URI environment variable not set.");
-} else {
-  mongoose.connect(mongoUri)
-    .then(() => console.log('MongoDB connected successfully.'))
-    .catch(err => console.error('MongoDB connection error:', err));
-}
-
-app.use(cors());
-app.use(express.json({ limit: '5mb' }));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback_secret_key_please_change',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000
-  }
-}));
-
-// --- STATIC FILE SERVING ---
-// Serve files from the session-specific directories
-app.use('/uploads/assessment_files', express.static(baseAssessmentFilesDir));
-
-
-// --- API CLIENTS ---
 const claudeApiKey = process.env.CLAUDE_API_KEY;
 let anthropic;
-if (claudeApiKey) {
-  anthropic = new Anthropic({ apiKey: claudeApiKey });
-} else {
-  console.error("CRITICAL: CLAUDE_API_KEY environment variable not set.");
-}
+if (claudeApiKey) anthropic = new Anthropic({ apiKey: claudeApiKey });
 
-// --- MONGOOSE SCHEMAS & MODELS ---
-const addressSchema = new mongoose.Schema({
-  addressLine1: String,
-  addressLine2: String,
-  suburb: String,
-  state: String,
-  postcode: String,
-}, { _id: false });
+const baseAssessmentFilesDir = path.join(__dirname, '../public/uploads/assessment_files');
 
-const assessmentSchema = new mongoose.Schema({
-  consent: Boolean,
-  diagnoses: {
-    herniatedDisc: Boolean,
-    spinalStenosis: Boolean,
-    spondylolisthesis: Boolean,
-    scoliosis: Boolean,
-    spinalFracture: Boolean,
-    degenerativeDiscDisease: Boolean,
-    otherConditionSelected: Boolean,
-    other: String,
-    mainSymptoms: String,
-    symptomDuration: String,
-    symptomProgression: String,
-  },
-  treatments: {
-    overTheCounterMedication: Boolean,
-    prescriptionAntiInflammatory: Boolean,
-    prescriptionAntiInflammatoryName: String,
-    prescriptionPainMedication: Boolean,
-    prescriptionPainMedicationName: String,
-    spinalInjections: Boolean,
-    spinalInjectionsDetails: String,
-    physiotherapy: Boolean,
-    chiropracticTreatment: Boolean,
-    osteopathyMyotherapy: Boolean,
-  },
-  hadSurgery: Boolean,
-  surgeries: [{ date: String, procedure: String, surgeon: String, hospital: String }],
-  imaging: [{
-    type: { type: String },
-    hadStudy: Boolean,
-    clinic: String,
-    date: String,
-    documentName: String,
-  }],
-  imagingRecordsPermission: Boolean,
-  painAreas: [{ id: String, region: String, intensity: Number, notes: String, coordinates: { x: Number, y: Number } }],
-  redFlags: {
-    muscleWeakness: { present: Boolean, areas: mongoose.Schema.Types.Mixed },
-    numbnessOrTingling: { present: Boolean, areas: mongoose.Schema.Types.Mixed },
-    unexplainedWeightLoss: { present: Boolean, period: String, amountKg: Number },
-    bladderOrBowelIncontinence: { present: Boolean, severity: Number, details: String },
-    saddleAnaesthesia: { present: Boolean, severity: Number, details: String },
-    balanceProblems: { present: { type: Boolean, default: false }, type: { type: String, default: '' } },
-    otherRedFlagPresent: Boolean,
-    otherRedFlag: String,
-  },
-  demographics: {
-    fullName: String,
-    dateOfBirth: String,
-    phoneNumber: String,
-    email: String,
-    residentialAddress: addressSchema,
-    isPostalSameAsResidential: Boolean,
-    postalAddress: addressSchema,
-    funding: {
-      source: String,
-      healthFundName: String,
-      membershipNumber: String,
-      claimNumber: String,
-      otherSource: String,
-    },
-    nextOfKin: {
-      fullName: String,
-      relationship: String,
-      phoneNumber: String,
-    },
-    referringDoctor: {
-      hasReferringDoctor: Boolean,
-      doctorName: String,
-      clinic: String,
-      phoneNumber: String,
-      email: String,
-      fax: String,
-    },
-    gender: String,
-    medicareNumber: String,
-    medicareRefNum: String,
-    countryOfBirth: String,
-  },
-  aiSummary: String,
-  treatmentGoals: String,
-  painMapImageFront: { type: String },
-  painMapImageBack: { type: String },
-  nextStep: { type: String },
-  recommendationText: { type: String },
-  systemRecommendation: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
-assessmentSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-const Assessment = mongoose.model('Assessment', assessmentSchema);
-
-// --- AUTHENTICATION ---
-const ensureAuthenticated = (req, res, next) => {
-  if (req.session && req.session.isAuthenticated) return next();
-  res.status(401).json({ error: 'Unauthorized. Please log in.' });
-};
-app.post('/api/doctor/login', (req, res) => {
-  if (req.body.password === process.env.DASHBOARD_PASSWORD) {
-    req.session.isAuthenticated = true;
-    res.status(200).json({ message: 'Login successful.' });
-  } else {
-    res.status(401).json({ error: 'Invalid password.' });
-  }
-});
-app.get('/api/doctor/check-auth', (req, res) => {
-  res.status(200).json({ isAuthenticated: !!(req.session && req.session.isAuthenticated) });
-});
-app.post('/api/doctor/logout', (req, res) => {
-  if (req.session) {
-    req.session.destroy(err => {
-      if (err) return res.status(500).json({ error: 'Could not log out.' });
-      res.clearCookie('connect.sid').status(200).json({ message: 'Logout successful.' });
-    });
-  } else {
-    res.status(200).json({ message: 'No active session.' });
-  }
-});
-
-// --- CORE API ENDPOINTS ---
-app.get('/api/doctor/patients', ensureAuthenticated, async (req, res) => {
-  try {
-    const assessments = await Assessment.find({}, 'demographics.fullName demographics.email').lean();
-    const patientsMap = new Map();
-    assessments.forEach(a => {
-      if (a.demographics && a.demographics.email && !patientsMap.has(a.demographics.email)) {
-        patientsMap.set(a.demographics.email, { id: a.demographics.email, name: a.demographics.fullName });
-      }
-    });
-    res.status(200).json(Array.from(patientsMap.values()));
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve patient list.' });
-  }
-});
-app.get('/api/doctor/patient/:email/assessments', ensureAuthenticated, async (req, res) => {
-  try {
-    const assessments = await Assessment.find({ 'demographics.email': req.params.email }).sort({ createdAt: -1 });
-    res.status(200).json(assessments || []);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve assessments.' });
-  }
-});
-app.post('/api/assessment', async (req, res) => {
-  try {
-    const newAssessment = new Assessment(req.body);
-    await newAssessment.save();
-    res.status(201).json({ message: 'Assessment saved successfully', assessmentId: newAssessment._id });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to save assessment data.' });
-  }
-});
-
-app.delete('/api/doctor/assessment/:id', ensureAuthenticated, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await Assessment.findByIdAndDelete(id);
-    if (!result) {
-      return res.status(404).json({ error: 'Assessment not found.' });
-    }
-    res.status(200).json({ message: 'Assessment deleted successfully.' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete assessment.' });
-  }
-});
-
-app.delete('/api/doctor/user/:email', ensureAuthenticated, async (req, res) => {
-  try {
-    const { email } = req.params;
-    const result = await Assessment.deleteMany({ 'demographics.email': email });
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'No assessments found for this user.' });
-    }
-    res.status(200).json({ message: `${result.deletedCount} assessments for user ${email} deleted successfully.` });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete user assessments.' });
-  }
-});
-
-// --- FILE UPLOAD LOGIC (REVISED) ---
-const tempStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, tempUploadDir); // Always upload to the temporary directory first
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${sanitizedOriginalName}`);
-  }
-});
-const upload = multer({ storage: tempStorage, limits: { fileSize: 10 * 1024 * 1024 } });
-
-app.post('/api/upload/imaging-file', upload.single('imagingFile'), (req, res, next) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded.' });
-  }
-
-  const formSessionId = req.query.formSessionId || 'default_session';
-  const sanitizedSessionId = formSessionId.replace(/[^a-zA-Z0-9_-]/g, '');
-  
-  const finalSessionDir = path.join(baseAssessmentFilesDir, sanitizedSessionId);
-  if (!fs.existsSync(finalSessionDir)) {
-    fs.mkdirSync(finalSessionDir, { recursive: true });
-  }
-
-  const tempPath = req.file.path;
-  const finalPath = path.join(finalSessionDir, req.file.filename);
-  
-  // Move the file from temp to the final session directory
-  fs.rename(tempPath, finalPath, (err) => {
-    if (err) {
-      console.error('Error moving file:', err);
-      // Try to clean up the temp file
-      try {
-        fs.unlinkSync(tempPath);
-      } catch (unlinkErr) {
-        console.error('Error cleaning up temp file:', unlinkErr);
-      }
-      return res.status(500).json({ error: 'Failed to process file upload.' });
-    }
-
-    // The relative path for the URL should be based on the final location
-    let relativeFilePath = path.join(sanitizedSessionId, req.file.filename);
-    if (path.sep === '\\') {
-      relativeFilePath = relativeFilePath.replace(/\\/g, '/');
-    }
-
-    res.status(200).json({
-      message: 'File uploaded successfully',
-      filePath: relativeFilePath
-    });
-  });
-});
-
-app.post('/api/upload/pain-map', async (req, res) => {
-  const { imageData, view, formSessionId } = req.body;
-
-  if (!imageData || !view || !formSessionId) {
-    return res.status(400).json({ error: 'Missing required data for pain map upload.' });
-  }
-
-  try {
-    const base64Data = imageData.replace(/^data:image\/png;base64,/, "");
-    const sanitizedSessionId = formSessionId.replace(/[^a-zA-Z0-9_-]/g, '');
-    const finalSessionDir = path.join(baseAssessmentFilesDir, sanitizedSessionId);
-
-    if (!fs.existsSync(finalSessionDir)) {
-      fs.mkdirSync(finalSessionDir, { recursive: true });
-    }
-
-    const filename = `pain-map-${view}-${Date.now()}.png`;
-    const finalPath = path.join(finalSessionDir, filename);
-    
-    fs.writeFileSync(finalPath, base64Data, 'base64');
-
-    let relativeFilePath = path.join(sanitizedSessionId, filename);
-    if (path.sep === '\\') {
-      relativeFilePath = relativeFilePath.replace(/\\/g, '/');
-    }
-
-    res.status(200).json({
-      message: 'Pain map uploaded successfully',
-      filePath: relativeFilePath
-    });
-  } catch (error) {
-    console.error('Error saving pain map image:', error);
-    res.status(500).json({ error: 'Failed to save pain map image.' });
-  }
-});
-
-
-// --- AI & EMAIL ENDPOINTS ---
-app.post('/api/generate-summary', async (req, res) => {
+router.post('/generate-summary', async (req, res) => {
   if (!anthropic) {
     return res.status(500).json({ error: 'Claude API client not initialized on server. API key may be missing or invalid.' });
   }
 
   try {
     const formData = req.body;
-
     if (!formData) {
       return res.status(400).json({ error: 'No form data received.' });
     }
 
     const comprehensivePrompt = generateComprehensivePrompt(formData);
-
-    console.log("Sending prompt to Claude API...");
-
     const claudeResponse = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
       max_tokens: 1024,
@@ -379,9 +38,7 @@ app.post('/api/generate-summary', async (req, res) => {
         console.warn("Unexpected Claude API response structure:", claudeResponse);
     }
     
-    console.log("Received summary from Claude API.");
     res.status(200).json({ summary: summary });
-
   } catch (error) {
     console.error('Error in /api/generate-summary endpoint:', error);
     let errorMessage = 'Failed to generate AI summary via backend.';
@@ -393,14 +50,24 @@ app.post('/api/generate-summary', async (req, res) => {
     res.status(500).json({ error: errorMessage });
   }
 });
-app.post('/api/email/send-assessment', async (req, res) => {
+
+router.post('/assessment', async (req, res) => {
+  try {
+    const newAssessment = new Assessment(req.body);
+    await newAssessment.save();
+    res.status(201).json({ message: 'Assessment saved successfully', assessmentId: newAssessment._id });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save assessment data.' });
+  }
+});
+
+router.post('/email/send-assessment', async (req, res) => {
   if (!transporter) {
     return res.status(503).json({ error: 'Email service is not configured or unavailable.' });
   }
 
   try {
-    const { formData, aiSummary, recommendationText, nextStep, systemRecommendation, clientOrigin } = req.body;
-
+    const { formData, aiSummary } = req.body;
     if (!formData || !aiSummary) {
       return res.status(400).json({ error: 'Missing required data for email (formData or aiSummary).' });
     }
@@ -412,8 +79,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
         return res.status(500).json({ error: 'Primary email recipient not configured on server.' });
     }
 
-    const adminRecipients = new Set();
-    adminRecipients.add(primaryRecipient);
+    const adminRecipients = new Set([primaryRecipient]);
     if (process.env.BCC_EMAIL_RECIPIENT_ADDRESS) {
         process.env.BCC_EMAIL_RECIPIENT_ADDRESS.split(',').forEach(bcc => adminRecipients.add(bcc.trim()));
     }
@@ -421,7 +87,6 @@ app.post('/api/email/send-assessment', async (req, res) => {
     const patientEmail = formData.demographics?.email;
     const subjectDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    // Send email to admin/BCC
     const attachments = [];
     if (formData.painMapImageFront) {
       const frontImagePath = path.join(baseAssessmentFilesDir, formData.painMapImageFront);
@@ -444,8 +109,7 @@ app.post('/api/email/send-assessment', async (req, res) => {
       }
     }
 
-    // Send email to admin/BCC
-    const adminHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: formData.systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'admin');
+    const adminHtmlContent = generateAssessmentEmailHTML({ ...req.body }, serverBaseUrl, 'admin');
     const adminMailOptions = {
       from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
       to: Array.from(adminRecipients).join(', '),
@@ -455,56 +119,22 @@ app.post('/api/email/send-assessment', async (req, res) => {
     };
     await transporter.sendMail(adminMailOptions);
 
-    // Send email to patient
     if (patientEmail && typeof patientEmail === 'string' && patientEmail.trim() !== '' && !adminRecipients.has(patientEmail)) {
-      const patientHtmlContent = generateAssessmentEmailHTML({ formData, aiSummary, recommendationText: formData.systemRecommendation, nextStep: formData.nextStep }, serverBaseUrl, 'patient');
+      const patientHtmlContent = generateAssessmentEmailHTML({ ...req.body }, serverBaseUrl, 'patient');
       const patientMailOptions = {
         from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
         to: patientEmail,
         subject: `Your Spine Assessment Summary - ${subjectDate}`,
         html: patientHtmlContent,
-        // No attachments for the patient email
       };
       await transporter.sendMail(patientMailOptions);
     }
 
     res.status(200).json({ message: 'Assessment email(s) sent successfully.' });
-
   } catch (error) {
     console.error('Error sending assessment email:', error);
     res.status(500).json({ error: 'Failed to send assessment email.' });
   }
-});
-
-// --- NODEMAILER & SERVER START ---
-let transporter;
-if (process.env.MAILGUN_SMTP_LOGIN && process.env.MAILGUN_SMTP_PASSWORD) {
-  transporter = nodemailer.createTransport({
-    host: process.env.MAILGUN_SMTP_SERVER,
-    port: parseInt(process.env.MAILGUN_SMTP_PORT || "587", 10),
-    secure: parseInt(process.env.MAILGUN_SMTP_PORT || "587", 10) === 465,
-    auth: {
-      user: process.env.MAILGUN_SMTP_LOGIN,
-      pass: process.env.MAILGUN_SMTP_PASSWORD,
-    },
-  });
-
-  transporter.verify((error, success) => {
-    if (error) {
-      console.error('Nodemailer transporter verification error:', error);
-    } else {
-      console.log('Nodemailer transporter is ready to send emails.');
-    }
-  });
-} else {
-  console.warn('Mailgun SMTP credentials not fully set in .env. Email sending will be disabled.');
-}
-
-// --- SERVER START ---
-const server = http.createServer(app);
-
-server.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
 });
 
 function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
@@ -676,8 +306,8 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
       }
       if (unexplainedWeightLoss?.present) {
         redFlagsHtml += `<li>Unexplained Weight Loss: Present`;
-        if (unexplainedWeightLoss.amountKg !== undefined) redFlagsHtml += `, Amount: ${unexplainedWeightLoss.amountKg}kg`;
-        if (unexplainedWeightLoss.period) redFlagsHtml += `, Period: ${unexplainedWeightLoss.period}`;
+        if (unexplainedWeightLoss.amountKg !== undefined) comprehensivePrompt += `, Amount: ${unexplainedWeightLoss.amountKg}kg`;
+        if (unexplainedWeightLoss.period) comprehensivePrompt += `, Period: ${unexplainedWeightLoss.period}`;
         redFlagsHtml += `</li>`;
       }
       if (bladderOrBowelIncontinence?.present) {
@@ -869,3 +499,5 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
   `;
   return html;
 }
+
+module.exports = router;
