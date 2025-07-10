@@ -869,23 +869,3 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
   `;
   return html;
 }
-<environment_details>
-# VSCode Visible Files
-server/app.js
-
-# VSCode Open Tabs
-server/.env
-client/src/components/DoctorDashboard.tsx
-client/src/components/steps/SummaryStep.tsx
-server/prompt-builder.js
-server/app.js
-
-# Current Time
-10/07/2025, 12:36:27 pm (Australia/Sydney, UTC+10:00)
-
-# Context Window Usage
-221,706 / 1,048.576K tokens used (21%)
-
-# Current Mode
-ACT MODE
-</environment_details>
