@@ -23,7 +23,7 @@ Focus on:
 - Patient's stated goals for treatment.
 - Specific red flag symptoms reported, including all details like severity, location, type, amount, and period.
 Highlight potential red flags or areas needing further investigation based ONLY on the provided data, considering the patient's age and overall clinical picture.
-Maintain an objective, structured, and professional tone. Do not provide medical advice or diagnoses not directly derivable from the input.
+Maintain an objective, structured, and professional tone. Do not provide medical advice or diagnoses not directly derivable from the input. It is imperative that the word "recommendation" or its variations are not used in the summary.
 The summary should be suitable for a medical professional to quickly understand the patient's situation.
 
 Patient Data:
