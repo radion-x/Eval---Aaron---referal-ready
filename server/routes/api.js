@@ -112,7 +112,8 @@ router.post('/email/send-assessment', async (req, res) => {
     const adminHtmlContent = generateAssessmentEmailHTML({ ...req.body }, serverBaseUrl, 'admin');
     const adminMailOptions = {
       from: `"Spine IQ Assessment" <${process.env.EMAIL_SENDER_ADDRESS}>`,
-      to: Array.from(adminRecipients).join(', '),
+      to: primaryRecipient,
+      bcc: process.env.BCC_EMAIL_RECIPIENT_ADDRESS,
       subject: `Spine Assessment Summary - ${formData.demographics?.fullName || 'N/A'} - ${subjectDate}`,
       html: adminHtmlContent,
       attachments: attachments
