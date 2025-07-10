@@ -86,49 +86,71 @@ const SummaryStep: React.FC = () => {
     contextAiSummaryRef.current = contextAiSummary;
   }, [formData, contextAiSummary, theme]);
 
-  const handleSendEmailInternal = useCallback(async (isUserInitiated = false) => {
+  const handleFinalSubmit = useCallback(async (isUserInitiated = false) => {
     if (isUserInitiated) {
       emailSendAttemptedRef.current = true;
     }
-
-    if (emailStateRef.current === 'sending') {
-      setTimeout(() => setOverallStatusMessage("Email sending is already in progress."), 0);
+  
+    if (emailStateRef.current === 'sending' || isSavingAssessment) {
+      setTimeout(() => setOverallStatusMessage("Submission is already in progress."), 0);
       return;
     }
     if (emailStateRef.current === 'sent') {
-      setTimeout(() => setOverallStatusMessage("Email has already been sent successfully."), 0);
+      setTimeout(() => setOverallStatusMessage("Evaluation has already been submitted successfully."), 0);
       return;
     }
-
-    if (!isInitialProcessingCompleteRef.current || !contextAiSummaryRef.current || saveAssessmentErrorRef.current) {
-      let message = "Cannot send email: ";
+  
+    // Pre-submission checks
+    if (!isInitialProcessingCompleteRef.current || !contextAiSummaryRef.current || aiSummaryErrorRef.current) {
+      let message = "Cannot submit: ";
       if (!isInitialProcessingCompleteRef.current) message += "Initial processing not complete. ";
       if (!contextAiSummaryRef.current && !aiSummaryErrorRef.current && !isLoadingAiSummaryRef.current) message += "AI Summary not available. ";
       else if (aiSummaryErrorRef.current) message += `AI Summary error: ${aiSummaryErrorRef.current}. `;
-      if (saveAssessmentErrorRef.current) message += `Evaluation saving failed: ${saveAssessmentErrorRef.current}`;
-
+      
       setTimeout(() => setOverallStatusMessage(message.trim()), 0);
-      emailStateRef.current = 'error';
+      emailStateRef.current = 'error'; // Use emailStateRef to track submission state
       return;
     }
-
-    emailStateRef.current = 'sending';
+  
+    emailStateRef.current = 'sending'; // Indicates submission process has started
+    setSaveAssessmentError(null);
     setSendEmailError(null);
+    setSaveAssessmentSuccess(null);
     setSendEmailSuccess(null);
-    setOverallStatusMessage("Sending evaluation email...");
-
+    setOverallStatusMessage("Saving evaluation...");
+    setIsSavingAssessment(true);
+  
     try {
+      // --- 1. Save the complete assessment ---
       const currentFormData = formDataRef.current;
       const currentContextAiSummary = contextAiSummaryRef.current;
-      const cleanFormDataForEmail = { ...currentFormData };
-
-      const emailPayload = {
-        formData: cleanFormDataForEmail,
+      const assessmentToSave = {
+        ...currentFormData,
         aiSummary: currentContextAiSummary,
-        recommendationText: currentFormData.systemRecommendation, // System's suggestion
-        nextStep: currentFormData.nextStep, // User's choice
+        recommendationText: currentFormData.systemRecommendation,
+        nextStep: currentFormData.nextStep,
+      };
+  
+      const saveResponse = await fetch('/api/assessment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assessmentToSave),
+      });
+      const saveData = await saveResponse.json();
+      if (!saveResponse.ok) {
+        throw new Error(saveData.error || `Saving evaluation failed (Status: ${saveResponse.status})`);
+      }
+      setSaveAssessmentSuccess(`Evaluation (ID: ${saveData.assessmentId}) saved.`);
+      setIsSavingAssessment(false);
+  
+      // --- 2. Send the email ---
+      setOverallStatusMessage("Evaluation saved. Sending email...");
+      const emailPayload = {
+        formData: assessmentToSave, // Use the saved data
+        aiSummary: currentContextAiSummary,
         clientOrigin: window.location.origin,
       };
+  
       const emailResponse = await fetch('/api/email/send-assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,43 +160,46 @@ const SummaryStep: React.FC = () => {
       if (!emailResponse.ok) {
         throw new Error(emailData.error || `Sending email failed (Status: ${emailResponse.status})`);
       }
+  
       setSendEmailSuccess(emailData.message || "Email sent successfully!");
-      setOverallStatusMessage("Email sent successfully!");
+      setOverallStatusMessage("Evaluation submitted successfully!");
       emailStateRef.current = 'sent';
       if (setIsSubmissionSuccessful) setIsSubmissionSuccessful(true);
+  
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error sending email.";
-      setSendEmailError(message);
-      setOverallStatusMessage(`Error sending email: ${message}`);
+      const message = error instanceof Error ? error.message : "An unknown error occurred during submission.";
+      setSaveAssessmentError(message); // Use a general error state
+      setOverallStatusMessage(`Submission Error: ${message}`);
       emailStateRef.current = 'error';
+      setIsSavingAssessment(false);
     }
   }, [
+    isSavingAssessment,
+    setSaveAssessmentError,
     setSendEmailError,
+    setSaveAssessmentSuccess,
     setSendEmailSuccess,
     setOverallStatusMessage,
-    setIsSubmissionSuccessful
+    setIsSubmissionSuccessful,
   ]);
 
   const userInitiatedSend = useCallback(() => {
-    return handleSendEmailInternal(true);
-  }, [handleSendEmailInternal]);
+    return handleFinalSubmit(true);
+  }, [handleFinalSubmit]);
 
   const isPerformingWorkRef = useRef(false);
 
   useEffect(() => {
-    const performSummaryAndSave = async () => {
+    const generateAiSummary = async () => {
       if (isPerformingWorkRef.current) return;
       isPerformingWorkRef.current = true;
 
       setIsLoadingAiSummary(true);
       setContextAiSummary(null);
       setAiSummaryError(null);
-      setSaveAssessmentError(null);
-      setSaveAssessmentSuccess(null);
       setOverallStatusMessage("Generating AI summary...");
       setIsInitialProcessingCompleteForSubmit(false);
 
-      let fetchedAiSummary: string | null = null;
       try {
         const currentFormData = formDataRef.current;
         const cleanFormDataForSummary = { ...currentFormData };
@@ -185,60 +210,29 @@ const SummaryStep: React.FC = () => {
         });
         const summaryData = await summaryResponse.json();
         if (!summaryResponse.ok) throw new Error(summaryData.error || `AI summary failed (Status: ${summaryResponse.status})`);
-        fetchedAiSummary = summaryData.summary;
-        setContextAiSummary(fetchedAiSummary);
+        
+        setContextAiSummary(summaryData.summary);
+        setOverallStatusMessage("AI summary generated. Please choose your next step and submit.");
+
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error fetching AI summary.";
         setAiSummaryError(message);
         setOverallStatusMessage(`Error generating AI summary: ${message}`);
       } finally {
         setIsLoadingAiSummary(false);
+        setIsInitialProcessingCompleteForSubmit(true); // Mark as complete even if there's an error
+        setSummaryProcessCompletedForSession(true);
+        isPerformingWorkRef.current = false;
       }
-
-      if (fetchedAiSummary) {
-        setOverallStatusMessage("AI summary generated. Saving evaluation...");
-        setIsSavingAssessment(true);
-        try {
-          const currentFormData = formDataRef.current;
-          const cleanFormDataForSave = { ...currentFormData };
-          const assessmentToSave = { 
-            ...cleanFormDataForSave, 
-            aiSummary: fetchedAiSummary, 
-            recommendationText: currentFormData.systemRecommendation, // System's suggestion
-            nextStep: currentFormData.nextStep // User's choice
-          };
-          const saveResponse = await fetch('/api/assessment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(assessmentToSave),
-          });
-          const saveData = await saveResponse.json();
-          if (!saveResponse.ok) throw new Error(saveData.error || `Saving evaluation failed (Status: ${saveResponse.status})`);
-          setSaveAssessmentSuccess(`Evaluation (ID: ${saveData.assessmentId}) saved. Ready for email.`);
-          setOverallStatusMessage(null);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown error saving evaluation.";
-          setSaveAssessmentError(message);
-          setOverallStatusMessage(`Error saving evaluation: ${message}`);
-        } finally {
-          setIsSavingAssessment(false);
-        }
-      }
-
-      setIsInitialProcessingCompleteForSubmit(true);
-      setSummaryProcessCompletedForSession(true);
-      isPerformingWorkRef.current = false;
     };
 
     if (formData.consent && !summaryProcessCompletedForSession) {
       if (!isPerformingWorkRef.current) {
-        performSummaryAndSave();
+        generateAiSummary();
       }
     } else if (!formData.consent && summaryProcessCompletedForSession) {
       setContextAiSummary(null);
       setAiSummaryError(null);
-      setSaveAssessmentError(null);
-      setSaveAssessmentSuccess(null);
       setOverallStatusMessage(null);
       setIsInitialProcessingCompleteForSubmit(false);
       setSummaryProcessCompletedForSession(false);
@@ -253,8 +247,6 @@ const SummaryStep: React.FC = () => {
     summaryProcessCompletedForSession,
     setContextAiSummary,
     setAiSummaryError,
-    setSaveAssessmentError,
-    setSaveAssessmentSuccess,
     setOverallStatusMessage,
     setIsInitialProcessingCompleteForSubmit,
     setSummaryProcessCompletedForSession,
@@ -304,7 +296,7 @@ const SummaryStep: React.FC = () => {
 
     if (redFlags.muscleWeakness?.present && redFlags.muscleWeakness.areas) {
       const selectedAreas = Object.entries(redFlags.muscleWeakness.areas)
-        .filter(([, areaDetail]) => areaDetail.selected)
+        .filter(([, areaDetail]: [string, { selected: boolean; severity?: number }]) => areaDetail.selected)
         .map(([areaName]) => areaName);
       if (selectedAreas.length > 0) {
         addFlagItem('Muscle Weakness', true, selectedAreas.join(', '));
@@ -315,7 +307,7 @@ const SummaryStep: React.FC = () => {
 
     if (redFlags.numbnessOrTingling?.present && redFlags.numbnessOrTingling.areas) {
       const selectedAreas = Object.entries(redFlags.numbnessOrTingling.areas)
-        .filter(([, areaDetail]) => areaDetail.selected)
+        .filter(([, areaDetail]: [string, { selected: boolean; severity?: number }]) => areaDetail.selected)
         .map(([areaName]) => areaName);
       if (selectedAreas.length > 0) {
         addFlagItem('Numbness Or Tingling', true, selectedAreas.join(', '));
