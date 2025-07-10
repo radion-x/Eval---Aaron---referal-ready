@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { FormProvider } from './context/FormContext';
 import FormStepper from './components/FormStepper';
-import DoctorDashboard from './components/DoctorDashboard'; // Import DoctorDashboard
+import DoctorRoutes from './routing/DoctorRoutes';
 import PlasmaBackground from './components/PlasmaBackground';
 import ThemeToggleButton from './components/ThemeToggleButton';
 import './App.css';
@@ -21,7 +21,7 @@ function AppContent() {
       </nav>
       <Routes>
         <Route path="/" element={<PatientFormPage />} />
-        <Route path="/doctors" element={<DoctorDashboard />} />
+        <Route path="/doctors/*" element={<DoctorRoutes />} />
       </Routes>
     </div>
   );
