@@ -84,7 +84,7 @@ export interface Address {
 }
 
 export interface Funding {
-  source: 'Private Health Insurance' | 'Workers Compensation' | 'DVA' | 'TAC' | 'Paying myself' | 'Other' | '';
+  source: 'Private Health Insurance' | 'Workers Compensation' | 'DVA' | 'TAC' | 'Uninsured' | 'Other' | '';
   healthFundName?: string;
   membershipNumber?: string;
   claimNumber?: string;

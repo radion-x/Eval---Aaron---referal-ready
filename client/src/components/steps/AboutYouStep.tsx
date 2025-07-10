@@ -337,7 +337,7 @@ const AboutYouStep: React.FC = () => {
               What is your insurance or funding source for treatment? *
             </label>
             <div className="space-y-2">
-              {(['Private Health Insurance', 'Workers Compensation', 'DVA', 'TAC', 'Paying myself', 'Other'] as const).map((source) => (
+              {(['Private Health Insurance', 'Workers Compensation', 'DVA', 'TAC', 'Uninsured', 'Other'] as const).map((source) => (
                 <div key={source} className="flex items-center">
                   <input
                     type="radio"
