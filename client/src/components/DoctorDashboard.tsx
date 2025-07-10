@@ -594,7 +594,7 @@ const DoctorDashboard: React.FC = () => {
                     )}
                     {renderTextSection("Next Step Chosen by User", assessment.nextStep)}
                     {renderTextSection("Adaptive Next-Step Evaluation", assessment.systemRecommendation)}
-                    {renderTextSection("AI Summary", assessment.aiSummary, true)}
+                    {renderTextSection("Initial Triage: Report and Summary", assessment.aiSummary, true)}
                     {/* Removed raw JSON dump */}
                   </div>
                 ))}

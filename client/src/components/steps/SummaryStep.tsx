@@ -365,7 +365,7 @@ const SummaryStep: React.FC = () => {
       <div className="space-y-8">
         <div className={cardBaseClass}>
           <div className={cardHeaderBaseClass}>
-            <h3 className={cardTitleBaseClass}>Spinal AI Matrix Analysis</h3>
+            <h3 className={cardTitleBaseClass}>Initial Triage: Report and Summary</h3>
           </div>
           <div className={`${cardContentBaseClass} min-h-[100px] flex flex-col justify-center items-center`}>
             {isLoadingAiSummary && !contextAiSummary && !aiSummaryError && (

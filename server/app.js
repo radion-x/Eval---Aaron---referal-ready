@@ -693,7 +693,7 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
     if (aiSummary) {
       html += `
         <div class="section">
-          <div class="section-title">Spinal AI Matrix Analysis</div>
+          <div class="section-title">Initial Triage: Report and Summary</div>
           <p>${aiSummary.replace(/\n/g, '<br>')}</p>
         </div>
       `;
@@ -998,7 +998,7 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
     if (aiSummary) {
       html += `
         <div class="section">
-          <div class="section-title">Spinal AI Matrix Analysis</div>
+          <div class="section-title">Initial Triage: Report and Summary</div>
           <p>${aiSummary.replace(/\n/g, '<br>')}</p>
         </div>
       `;
