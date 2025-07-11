@@ -495,6 +495,7 @@ const SummaryStep: React.FC = () => {
                   {formDataRef.current.imaging.filter(img => img.hadStudy).map((img, index) => (
                     <li key={index} className={listItemBaseClass}>
                       {img.type} {img.date && `(${formatDate(img.date)})`} {img.clinic && ` at ${img.clinic}`}
+                      {img.spinalRegions && img.spinalRegions.length > 0 && ` - Regions: ${img.spinalRegions.join(', ')}`}
                       {img.documentName && (
                         <a
                           href={`${import.meta.env.VITE_SERVER_BASE_URL}/uploads/assessment_files/${img.documentName}`}

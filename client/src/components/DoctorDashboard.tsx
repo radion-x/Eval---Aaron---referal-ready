@@ -50,7 +50,8 @@ interface ServerAssessment {
     hadStudy?: boolean;
     clinic?: string;
     date?: string;
-    documentName?: string; 
+    documentName?: string;
+    spinalRegions?: string[];
   }>;
   painAreas?: Array<{
     id?: string; 
@@ -373,7 +374,7 @@ const DoctorDashboard: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
             <thead className="bg-gray-100 dark:bg-gray-800">
-              <tr><th className="p-2">Type</th><th className="p-2">Date</th><th className="p-2">Clinic</th><th className="p-2">Document</th></tr>
+              <tr><th className="p-2">Type</th><th className="p-2">Date</th><th className="p-2">Clinic</th><th className="p-2">Spinal Region</th><th className="p-2">Document</th></tr>
             </thead>
             <tbody>
               {studies.map((img, i) => {
@@ -384,6 +385,7 @@ const DoctorDashboard: React.FC = () => {
                     <td className="p-2">{img.type || 'N/A'}</td>
                     <td className="p-2">{img.date || 'N/A'}</td>
                     <td className="p-2">{img.clinic || 'N/A'}</td>
+                    <td className="p-2">{(img.spinalRegions && img.spinalRegions.length) ? img.spinalRegions.join(', ') : 'N/A'}</td>
                     <td className="p-2">
                       {img.documentName ? (
                         <a href={documentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">

@@ -9,6 +9,14 @@ type UploadStatus = {
   successMessage: string | null;
 };
 
+const spinalRegions = [
+  'Cervical',
+  'Thoracic',
+  'Lumbar',
+  'Sacral',
+  'Coccygeal'
+];
+
 const ImagingHistoryStep: React.FC = () => {
   const { formData, updateFormData, formSessionId } = useFormContext(); // Added formSessionId
   
@@ -20,11 +28,15 @@ const ImagingHistoryStep: React.FC = () => {
   }));
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>(initialUploadStatuses);
 
-  const updateImagingField = (index: number, field: keyof Imaging, value: Imaging[keyof Imaging]) => {
+  const updateImagingField = (index: number, field: keyof Imaging, value: any) => {
     const updatedImaging = formData.imaging.map((item, i) => 
       i === index ? { ...item, [field]: value } : item
     );
     updateFormData({ imaging: updatedImaging });
+  };
+
+  const handleSpinalRegionChange = (index: number, selectedRegions: string[]) => {
+    updateImagingField(index, 'spinalRegions', selectedRegions);
   };
   
   const handleFileChange = async (index: number, file: File | undefined) => {
@@ -93,6 +105,7 @@ const ImagingHistoryStep: React.FC = () => {
                 <th className="text-center py-3 px-4 font-semibold text-slate-700 dark:text-gray-200 border-b dark:border-gray-600">Had This?</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-gray-200 border-b dark:border-gray-600">Radiology Clinic</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-gray-200 border-b dark:border-gray-600">Date</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-gray-200 border-b dark:border-gray-600">Spinal Region</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-gray-200 border-b dark:border-gray-600 min-w-[250px]">Upload Document</th> 
               </tr>
             </thead>
@@ -151,6 +164,20 @@ const ImagingHistoryStep: React.FC = () => {
                         value={image.date || ''}
                         onChange={(e) => updateImagingField(index, 'date', e.target.value)}
                       />
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {image.hadStudy && (
+                      <select
+                        multiple
+                        className="w-full px-3 py-1 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={image.spinalRegions || []}
+                        onChange={(e) => handleSpinalRegionChange(index, Array.from(e.target.selectedOptions, option => option.value))}
+                      >
+                        {spinalRegions.map(region => (
+                          <option key={region} value={region}>{region}</option>
+                        ))}
+                      </select>
                     )}
                   </td>
                   <td className="py-3 px-4">

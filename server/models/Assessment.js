@@ -43,6 +43,7 @@ const assessmentSchema = new mongoose.Schema({
     clinic: String,
     date: String,
     documentName: String,
+    spinalRegions: [String],
   }],
   imagingRecordsPermission: Boolean,
   painAreas: [{ id: String, region: String, intensity: Number, notes: String, coordinates: { x: Number, y: Number } }],

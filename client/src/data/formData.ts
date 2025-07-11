@@ -20,6 +20,7 @@ export interface Imaging {
   date?: string;
   document?: File; // For the file input
   documentName?: string; // To store the path/name of the uploaded file from server
+  spinalRegions?: string[];
 }
 
 // New interface for a generic red flag item
@@ -212,11 +213,11 @@ export const initialFormData: FormData = {
   surgeries: [],
 
   imaging: [
-    { type: 'X-Ray', hadStudy: false, clinic: '', date: '' },
-    { type: 'MRI', hadStudy: false, clinic: '', date: '' },
-    { type: 'CT Scan', hadStudy: false, clinic: '', date: '' },
-    { type: 'CT Myelogram', hadStudy: false, clinic: '', date: '' },
-    { type: 'EMG/Nerve Conduction', hadStudy: false, clinic: '', date: '' },
+    { type: 'X-Ray', hadStudy: false, clinic: '', date: '', spinalRegions: [] },
+    { type: 'MRI', hadStudy: false, clinic: '', date: '', spinalRegions: [] },
+    { type: 'CT Scan', hadStudy: false, clinic: '', date: '', spinalRegions: [] },
+    { type: 'CT Myelogram', hadStudy: false, clinic: '', date: '', spinalRegions: [] },
+    { type: 'EMG/Nerve Conduction', hadStudy: false, clinic: '', date: '', spinalRegions: [] },
   ],
 
   painAreas: [],

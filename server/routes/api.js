@@ -422,7 +422,7 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
       <div class="section">
         <div class="section-title">Imaging History</div>
         <table>
-          <thead><tr><th>Type</th><th>Date</th><th>Clinic</th><th>Document</th></tr></thead>
+          <thead><tr><th>Type</th><th>Date</th><th>Clinic</th><th>Spinal Region</th><th>Document</th></tr></thead>
           <tbody>
             ${formData.imaging.filter(img => img.hadStudy).map(img => {
               let docLink = 'N/A';
@@ -436,6 +436,7 @@ function generateAssessmentEmailHTML(data, serverBaseUrl, recipientType) {
                   <td>${img.type || 'N/A'}</td>
                   <td>${img.date || 'N/A'}</td>
                   <td>${img.clinic || 'N/A'}</td>
+                  <td>${(img.spinalRegions && img.spinalRegions.length) ? img.spinalRegions.join(', ') : 'N/A'}</td>
                   <td>${docLink}</td>
                 </tr>`;
             }).join('')}
