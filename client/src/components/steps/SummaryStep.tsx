@@ -197,7 +197,7 @@ const SummaryStep: React.FC = () => {
       setIsLoadingAiSummary(true);
       setContextAiSummary(null);
       setAiSummaryError(null);
-      setOverallStatusMessage("Generating AI summary...");
+      setOverallStatusMessage("Generating Summary...");
       setIsInitialProcessingCompleteForSubmit(false);
 
       try {
@@ -371,7 +371,7 @@ const SummaryStep: React.FC = () => {
             {isLoadingAiSummary && !contextAiSummary && !aiSummaryError && (
               <div className="flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
                 <div className="flex items-center">
-                  <span className="mr-2 text-lg">Generating AI summary</span>
+                  <span className="mr-2 text-lg">Generating Summary</span>
                   <span className="thinking-dot bg-gray-500 dark:bg-gray-400 thinking-dot-delay-1"></span>
                   <span className="thinking-dot bg-gray-500 dark:bg-gray-400 thinking-dot-delay-2 mx-0.5"></span>
                   <span className="thinking-dot bg-gray-500 dark:bg-gray-400"></span>
